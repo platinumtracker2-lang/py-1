@@ -82,19 +82,22 @@ def insert_most_followed_stock(cursor, connection, name, ticker, open_price, clo
 def insert_stock_metrics(cursor, connection, stock_type, company_name, ticker, exchange, domiciled, mine_location, primary_resource, pureplay, market_cap, last_price, intraday_percentage, volume, ytd_percentage, week_52_low, week_52_high):
     """Insert stock metrics into the database"""
     try:
+        # Generate UUID for the record
+        record_id = str(uuid.uuid4())
+        
         # First delete existing records for this ticker
         cursor.execute("DELETE FROM api_app_stockmetrics WHERE ticker = %s", (ticker,))
         
         # Insert with correct column order matching the database schema
         cursor.execute("""
         INSERT INTO api_app_stockmetrics (
-            ticker, company_name, market_cap, volume, domiciled, exchange,
+            id, ticker, company_name, market_cap, volume, domiciled, exchange,
             intraday_percentage, last_price, mine_location, primary_resource,
             pureplay, stock_type, week_52_high, week_52_low, ytd_percentage,
             last_updated, updated_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
         """, (
-            ticker, company_name, market_cap, volume, domiciled, exchange,
+            record_id, ticker, company_name, market_cap, volume, domiciled, exchange,
             intraday_percentage, last_price, mine_location, primary_resource,
             pureplay, stock_type, week_52_high, week_52_low, ytd_percentage
         ))
@@ -286,9 +289,9 @@ def insert_stock_news(cursor, connection, stock_news_data):
     try:
         insert_query = """
         INSERT INTO api_app_stocknews (
-            ticker, company_name, exchange, yahoo_ticker, title, summary, 
+            id, ticker, company_name, exchange, yahoo_ticker, title, summary, 
             date, image_url, url, provider, created_at, updated_at
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (url) DO UPDATE SET
             title = EXCLUDED.title,
             summary = EXCLUDED.summary,
@@ -298,16 +301,24 @@ def insert_stock_news(cursor, connection, stock_news_data):
             updated_at = CURRENT_TIMESTAMP;
         """
         
+        # Generate UUID for the record
+        record_id = str(uuid.uuid4())
         current_time = datetime.now()
         
+        # Handle None date - use current date if date is None (date field is NOT NULL in database)
+        news_date = stock_news_data.get('date')
+        if news_date is None:
+            news_date = current_time.strftime("%Y-%m-%d")
+        
         data = (
+            record_id,
             stock_news_data['ticker'],
             stock_news_data['company_name'],
             stock_news_data['exchange'],
             stock_news_data['yahoo_ticker'],
             stock_news_data['title'],
             stock_news_data['summary'],
-            stock_news_data['date'],
+            news_date,
             stock_news_data['image'],
             stock_news_data['url'],
             stock_news_data['provider'],

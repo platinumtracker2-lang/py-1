@@ -11,9 +11,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def load_copper_stocks():
-    """Load copper stock tickers from CSV file"""
+    """Load lithium stock tickers from CSV file"""
     stocks = []
-    csv_path = 'copper_stocks_complete.csv'
+    csv_path = 'lithium_stocks_complete.csv'
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as file:

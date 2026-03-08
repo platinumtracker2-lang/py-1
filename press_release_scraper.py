@@ -56,7 +56,7 @@ def init_driver():
 def load_copper_stocks():
     """Load copper stock tickers from CSV file"""
     stocks = []
-    csv_path = 'copper_stocks_complete.csv'
+    csv_path = 'lithium_stocks_complete.csv'
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as file:

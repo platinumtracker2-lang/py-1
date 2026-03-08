@@ -62,7 +62,7 @@ custom_mappings = {
 def load_all_stock_data():
     """Load all stock data from CSV file with complete details"""
     stock_data = []
-    csv_path = 'copper_stocks_complete.csv'
+    csv_path = 'lithium_stocks_complete.csv'
     
     if not os.path.exists(csv_path):
         logger.error(f"CSV file not found: {csv_path}")
@@ -172,6 +172,32 @@ def calculate_ytd_return(stock):
         return None
     except Exception as e:
         logger.debug(f"Error calculating YTD return: {str(e)}")
+        return None
+
+def clean_numeric_value(value_str):
+    """Clean numeric string values for database insertion (remove $, commas, convert B/M/K to numbers)"""
+    if value_str is None or value_str == '':
+        return None
+    
+    try:
+        # Remove $ and % symbols
+        cleaned = str(value_str).replace('$', '').replace('%', '').replace(',', '').strip()
+        
+        # Handle B/M/K suffixes
+        multiplier = 1
+        if cleaned.endswith('B'):
+            multiplier = 1_000_000_000
+            cleaned = cleaned[:-1]
+        elif cleaned.endswith('M'):
+            multiplier = 1_000_000
+            cleaned = cleaned[:-1]
+        elif cleaned.endswith('K'):
+            multiplier = 1_000
+            cleaned = cleaned[:-1]
+        
+        # Convert to float and apply multiplier
+        return float(cleaned) * multiplier
+    except (ValueError, AttributeError):
         return None
 
 def format_market_cap(value):
@@ -332,21 +358,23 @@ def process_all_stocks():
                 processed += 1
                 
                 # Extract stock information from CSV
-                ticker = stock_row.get('Ticker', '').strip()
-                company_name = stock_row.get('Company Name', '').strip()
-                exchange = stock_row.get('Stock Exchange', '').strip()
-                domiciled = stock_row.get('Domiciled', '').strip()
+                ticker = stock_row.get('Ticker', '').strip()[:50]
+                company_name = stock_row.get('Company Name', '').strip()[:100]
+                exchange = stock_row.get('Stock Exchange', '').strip()[:50]
+                domiciled = stock_row.get('Domiciled', '').strip()[:50]
                 mine_location_country = stock_row.get('Mine Location Country', '').strip()
                 mine_location_state = stock_row.get('Mine Location State', '').strip()
-                company_type = stock_row.get('Company_Type', '').strip()
-                primary_assets = stock_row.get('Primary_Assets', '').strip()
-                secondary_assets = stock_row.get('Secondary_Assets', '').strip()
-                notes = stock_row.get('Notes', '').strip()
+                company_type = stock_row.get('Company_Type', '').strip()[:50]
+                primary_assets = stock_row.get('Primary_Assets', '').strip()[:50]
+                secondary_assets = stock_row.get('Secondary_Assets', '').strip()[:50]
+                notes = stock_row.get('Notes', '').strip()[:50]
                 
-                # Combine mine location info
+                # Combine mine location info (truncate to 50 chars for database)
                 mine_location = mine_location_country
                 if mine_location_state:
                     mine_location += f", {mine_location_state}"
+                # Truncate to 50 characters to fit database constraint
+                mine_location = mine_location[:50] if mine_location else None
                 
                 logger.info(f"\n📈 [{processed}/{total_stocks}] {company_name} ({ticker})")
                 logger.info(f"   Exchange: {exchange} | Type: {company_type} | Location: {domiciled}")
@@ -361,6 +389,7 @@ def process_all_stocks():
                 
                 # Insert into database
                 try:
+                    # Clean numeric values before insertion
                     insert_stock_metrics(
                         cursor=cursor,
                         connection=connection,
@@ -372,13 +401,13 @@ def process_all_stocks():
                         mine_location=mine_location,
                         primary_resource=primary_assets,
                         pureplay=notes,
-                        market_cap=stock_info['Market Cap'],
-                        last_price=stock_info['Last Price'],
-                        intraday_percentage=stock_info['Intraday %'],
-                        volume=stock_info['Volume'],
-                        ytd_percentage=stock_info['YTD %'],
-                        week_52_low=stock_info['Week 52 Low'],
-                        week_52_high=stock_info['Week 52 High']
+                        market_cap=clean_numeric_value(stock_info['Market Cap']),
+                        last_price=clean_numeric_value(stock_info['Last Price']),
+                        intraday_percentage=clean_numeric_value(stock_info['Intraday %']),
+                        volume=clean_numeric_value(stock_info['Volume']),
+                        ytd_percentage=clean_numeric_value(stock_info['YTD %']),
+                        week_52_low=clean_numeric_value(stock_info['Week 52 Low']),
+                        week_52_high=clean_numeric_value(stock_info['Week 52 High'])
                     )
                     successful += 1
                     logger.info(f"   ✅ Database updated successfully")

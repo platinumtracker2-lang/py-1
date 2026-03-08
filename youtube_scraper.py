@@ -1,8 +1,8 @@
 """
-YouTube Videos Updater Script for Copper Content
+YouTube Videos Updater Script for Lithium Content
 
 This script updates the VideoPageData table with fresh YouTube videos
-by searching for copper mining, copper market analysis, and copper-related content in different categories.
+by searching for lithium mining, lithium market analysis, and lithium-related content in different categories.
 """
 
 import sys
@@ -28,6 +28,25 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+def clean_views_string(views_str):
+    """
+    Clean views string and convert to integer.
+    
+    Args:
+        views_str (str): Views string like "10,825 views" or "453 views"
+    
+    Returns:
+        int: Number of views as integer, or None if parsing fails
+    """
+    try:
+        if not views_str:
+            return None
+        # Remove commas and "views" text, then convert to int
+        cleaned = views_str.replace(',', '').replace(' views', '').replace('views', '').strip()
+        return int(cleaned) if cleaned.isdigit() else None
+    except:
+        return None
 
 def parse_youtube_publish_time(publish_time_str):
     """
@@ -131,7 +150,7 @@ def search_youtube_videos(query, max_results=10):
                 'title': video.get('title', ''),
                 'link': f"https://www.youtube.com{url_suffix}",
                 'duration': video.get('duration', ''),
-                'views': video.get('views', ''),
+                'views': clean_views_string(video.get('views', '')),
                 'channel': video.get('channel', ''),
                 'publish_time': video.get('publish_time', ''),
                 'parsed_date': parse_youtube_publish_time(video.get('publish_time', '')),
@@ -191,7 +210,7 @@ def search_youtube_videos(query, max_results=10):
 
 def is_relevant_video(title, channel, duration):
     """
-    Check if video is relevant to copper content and has good quality indicators
+    Check if video is relevant to lithium content and has good quality indicators
     
     Args:
         title (str): Video title
@@ -203,11 +222,13 @@ def is_relevant_video(title, channel, duration):
     """
     text = (title + ' ' + channel).lower()
     
-    # Must contain copper-related keywords
+    # Must contain lithium-related keywords
     required_keywords = [
-        'copper', 'copper mining', 'copper price', 'copper market', 'copper stocks',
-        'copper futures', 'copper investment', 'industrial metals', 'base metals',
-        'mining', 'commodity', 'metal prices', 'copper demand', 'copper supply'
+        'lithium', 'lithium mining', 'lithium price', 'lithium market', 'lithium stocks',
+        'lithium futures', 'lithium investment', 'battery metals', 'ev metals',
+        'mining', 'commodity', 'metal prices', 'lithium demand', 'lithium supply',
+        'lithium carbonate', 'lithium hydroxide', 'spodumene', 'brine', 'hard rock lithium',
+        'electric vehicle', 'ev battery', 'battery technology'
     ]
     
     # Exclude irrelevant content
@@ -215,7 +236,8 @@ def is_relevant_video(title, channel, duration):
         'music', 'song', 'album', 'concert', 'gaming', 'game', 'movie', 'film',
         'recipe', 'cooking', 'fashion', 'beauty', 'sports', 'football', 'basketball',
         'unboxing', 'reaction', 'prank', 'challenge', 'tiktok', 'shorts compilation',
-        'copper wire diy', 'copper pipe', 'copper plumbing', 'copper jewelry making'
+        'lithium battery diy', 'lithium battery repair', 'phone battery', 'laptop battery',
+        'battery replacement', 'battery mod', 'battery hack'
     ]
     
     # Exclude channels that are likely to have low-quality content
@@ -255,28 +277,36 @@ def extract_company_info(title, channel):
     Returns:
         tuple: (company_name, stock_ticker)
     """
-    # Common copper companies and their tickers
+    # Common lithium companies and their tickers
     companies = {
-        'freeport': {'name': 'Freeport-McMoRan', 'ticker': 'FCX'},
-        'freeport mcmoran': {'name': 'Freeport-McMoRan', 'ticker': 'FCX'},
-        'southern copper': {'name': 'Southern Copper Corporation', 'ticker': 'SCCO'},
-        'grupo mexico': {'name': 'Grupo Mexico', 'ticker': 'GMEXICOB'},
-        'bhp': {'name': 'BHP Group', 'ticker': 'BHP'},
-        'rio tinto': {'name': 'Rio Tinto', 'ticker': 'RIO'},
-        'glencore': {'name': 'Glencore', 'ticker': 'GLEN'},
-        'antofagasta': {'name': 'Antofagasta', 'ticker': 'ANTO'},
-        'codelco': {'name': 'Codelco', 'ticker': 'CODELCO'},
-        'teck resources': {'name': 'Teck Resources', 'ticker': 'TECK'},
-        'first quantum': {'name': 'First Quantum Minerals', 'ticker': 'FM'},
-        'lundin mining': {'name': 'Lundin Mining', 'ticker': 'LUN'},
-        'hudbay minerals': {'name': 'Hudbay Minerals', 'ticker': 'HBM'},
-        'taseko mines': {'name': 'Taseko Mines', 'ticker': 'TKO'},
-        'copper mountain': {'name': 'Copper Mountain Mining', 'ticker': 'CMMC'},
-        'ero copper': {'name': 'Ero Copper', 'ticker': 'ERO'},
-        'ivanhoe mines': {'name': 'Ivanhoe Mines', 'ticker': 'IVN'},
-        'capstone copper': {'name': 'Capstone Copper', 'ticker': 'CS'},
-        'amerigo resources': {'name': 'Amerigo Resources', 'ticker': 'ARG'},
-        'trilogy metals': {'name': 'Trilogy Metals', 'ticker': 'TMQ'}
+        # Major Producers & Developers
+        'lithium americas': {'name': 'Lithium Americas', 'ticker': 'LAC'},
+        'standard lithium': {'name': 'Standard Lithium', 'ticker': 'SLI'},
+        'lithium argentina': {'name': 'Lithium Argentina', 'ticker': 'LAR'},
+        'sigma lithium': {'name': 'Sigma Lithium', 'ticker': 'SGML'},
+        'patriot battery': {'name': 'Patriot Battery Metals', 'ticker': 'PMET'},
+        'frontier lithium': {'name': 'Frontier Lithium', 'ticker': 'FL'},
+        'rock tech lithium': {'name': 'Rock Tech Lithium', 'ticker': 'RCK'},
+        'american lithium': {'name': 'American Lithium', 'ticker': 'LI'},
+        'lithium ionic': {'name': 'Lithium Ionic', 'ticker': 'LTH'},
+        'power metals': {'name': 'Power Metals', 'ticker': 'PWM'},
+        
+        # Explorers
+        'green technology': {'name': 'Green Technology Metals', 'ticker': 'GT'},
+        'snow lake lithium': {'name': 'Snow Lake Lithium', 'ticker': 'LITM'},
+        'snow lake': {'name': 'Snow Lake Lithium', 'ticker': 'LITM'},
+        'brunswick exploration': {'name': 'Brunswick Exploration', 'ticker': 'BRW'},
+        'li-ft power': {'name': 'Li-FT Power', 'ticker': 'LIFT'},
+        'lift power': {'name': 'Li-FT Power', 'ticker': 'LIFT'},
+        'volt lithium': {'name': 'Volt Lithium', 'ticker': 'VLT'},
+        
+        # International Giants
+        'albemarle': {'name': 'Albemarle Corporation', 'ticker': 'ALB'},
+        'livent': {'name': 'Livent Corporation', 'ticker': 'LTHM'},
+        'sqm': {'name': 'Sociedad Química y Minera', 'ticker': 'SQM'},
+        'ganfeng': {'name': 'Ganfeng Lithium', 'ticker': '1772.HK'},
+        'pilbara minerals': {'name': 'Pilbara Minerals', 'ticker': 'PLS.AX'},
+        'pilbara': {'name': 'Pilbara Minerals', 'ticker': 'PLS.AX'}
     }
     
     text = (title + ' ' + channel).lower()
@@ -289,44 +319,47 @@ def extract_company_info(title, channel):
 
 def scrape_youtube_videos():
     """
-    Main function to scrape YouTube videos for copper content.
+    Main function to scrape YouTube videos for lithium content.
     Returns a list of videos organized by category.
     """
     logger.info("=" * 60)
-    logger.info("Starting YouTube Videos Scraping for Copper Content")
+    logger.info("Starting YouTube Videos Scraping for Lithium Content")
     logger.info("=" * 60)
     
     # Define search queries for each category (multiple queries per category for better results)
     search_queries = {
         'Featured': [
-            'copper market analysis ',
-            'copper price forecast ', 
-            'copper investment outlook',
-            'copper vs gold investment',
-            'copper demand supply '
+            'lithium market analysis',
+            'lithium price forecast', 
+            'lithium investment outlook',
+            'lithium stocks 2024',
+            'lithium demand supply',
+            'battery metals investment'
         ],
         'Company': [
-            'copper mining stocks',
-            'Freeport McMoRan news',
-            'Southern Copper earnings',
-            'BHP copper production',
-            'Rio Tinto copper mining',
-            'copper mining companies'
+            'lithium mining stocks',
+            'Lithium Americas news',
+            'Albemarle lithium',
+            'Sigma Lithium production',
+            'lithium mining companies',
+            'lithium stock analysis'
         ],
         'Podcast': [
-            'copper market podcast',
-            'mining podcast ',
+            'lithium market podcast',
+            'battery metals podcast',
+            'mining podcast',
             'commodity trading podcast',
-            'copper investment interview',
-            'industrial metals podcast'
+            'lithium investment interview',
+            'ev metals podcast'
         ],
         'Education': [
-            'what is copper metal',
-            'how copper is mined',
-            'copper uses applications',
-            'copper market explained',
-            'copper investment guide',
-            'industrial metals explained'
+            'what is lithium metal',
+            'how lithium is mined',
+            'lithium uses applications',
+            'lithium market explained',
+            'lithium investment guide',
+            'battery metals explained',
+            'lithium carbonate vs hydroxide'
         ]
     }
     

@@ -27,7 +27,7 @@ def init_driver():
     chrome_options.add_argument("--window-size=1024,768")
     
     chrome_options.binary_location = "/usr/bin/chromium"
-    service = Service("/usr/local/bin/chromedriver")
+    service = Service("/usr/bin/chromedriver")
     
     driver = webdriver.Chrome(service=service, options=chrome_options)
     driver.set_page_load_timeout(30)
