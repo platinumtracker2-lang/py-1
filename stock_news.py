@@ -11,9 +11,9 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 def load_nickel_stocks():
-    """Load nickel stock tickers from CSV file"""
+    """Load gold & silver stock tickers from CSV file"""
     stocks = []
-    csv_path = 'nickel_stocks_complete.csv'
+    csv_path = 'gold_silver_stocks_complete.csv'
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as file:
@@ -33,7 +33,7 @@ def load_nickel_stocks():
                     'exchange': exchange
                 })
         
-        logging.info(f"Loaded {len(stocks)} nickel stocks from CSV")
+        logging.info(f"Loaded {len(stocks)} gold & silver stocks from CSV")
         return stocks
         
     except Exception as e:

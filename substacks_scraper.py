@@ -74,7 +74,7 @@ def wait_and_find_element(driver, by, value, timeout=10):
 
 def scrape_substack_nickel_posts(cursor=None, max_posts=10):
     """
-    Scrapes nickel-related posts from Substack.
+    Scrapes gold and silver related posts from Substack.
     
     Parameters:
         cursor (psycopg2.cursor, optional): Database cursor for checking duplicates
@@ -91,7 +91,7 @@ def scrape_substack_nickel_posts(cursor=None, max_posts=10):
     try:
         # Navigate to the search page
         print("Navigating to Substack search page...")
-        search_url = "https://substack.com/search/nickel?sort=new&searching=all_posts&include_recommendations=false"
+        search_url = "https://substack.com/search/gold+silver?sort=new&searching=all_posts&include_recommendations=false"
         driver.get(search_url)
         
         # Wait for the search results to load

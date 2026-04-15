@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Comprehensive Stock Fetcher for All 44+ Nickel Stocks
+Comprehensive Stock Fetcher for All Gold & Silver Stocks
 Fetches data from Yahoo Finance for all stocks in the CSV and inserts into database
 """
 
@@ -62,7 +62,7 @@ custom_mappings = {
 def load_all_stock_data():
     """Load all stock data from CSV file with complete details"""
     stock_data = []
-    csv_path = 'nickel_stocks_complete.csv'
+    csv_path = 'gold_silver_stocks_complete.csv'
     
     if not os.path.exists(csv_path):
         logger.error(f"CSV file not found: {csv_path}")
@@ -315,7 +315,7 @@ def get_stock_info_comprehensive(ticker_symbol, exchange, max_retries=3):
 
 def process_all_stocks():
     """Process all 224+ stocks from CSV and insert into database"""
-    logger.info("🚀 Starting comprehensive stock data processing...")
+    logger.info("🚀 Starting comprehensive gold & silver stock data processing...")
     
     # Load all stock data from CSV
     stock_data = load_all_stock_data()

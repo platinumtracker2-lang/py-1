@@ -1,8 +1,9 @@
 """
-YouTube Videos Updater Script for Nickel Content
+YouTube Videos Updater Script for Gold & Silver Content
 
 This script updates the VideoPageData table with fresh YouTube videos
-by searching for nickel mining, nickel market analysis, and nickel-related content in different categories.
+by searching for gold mining, silver mining, precious metals market analysis,
+and related content in different categories.
 """
 
 import sys
@@ -222,13 +223,17 @@ def is_relevant_video(title, channel, duration):
     """
     text = (title + ' ' + channel).lower()
     
-    # Must contain nickel-related keywords
+    # Must contain gold/silver-related keywords
     required_keywords = [
-        'nickel', 'nickel mining', 'nickel price', 'nickel market', 'nickel stocks',
-        'nickel futures', 'nickel investment', 'battery metals', 'ev metals',
-        'mining', 'commodity', 'metal prices', 'nickel demand', 'nickel supply',
-        'nickel sulphide', 'nickel laterite', 'class 1 nickel', 'nickel pig iron',
-        'electric vehicle', 'ev battery', 'battery technology', 'stainless steel'
+        'gold', 'silver', 'precious metals', 'gold mining', 'silver mining',
+        'gold price', 'silver price', 'gold market', 'silver market',
+        'gold stocks', 'silver stocks', 'gold futures', 'silver futures',
+        'gold investment', 'silver investment', 'gold etf', 'silver etf',
+        'gold royalty', 'silver royalty', 'gold streaming', 'gold bullion',
+        'silver bullion', 'xau', 'xag', 'mining stocks', 'commodity',
+        'metal prices', 'gold demand', 'silver demand', 'gold supply', 'silver supply',
+        'gold producer', 'silver producer', 'gold explorer', 'junior miner',
+        'central bank gold', 'gold reserve', 'safe haven', 'inflation hedge'
     ]
     
     # Exclude irrelevant content
@@ -236,8 +241,9 @@ def is_relevant_video(title, channel, duration):
         'music', 'song', 'album', 'concert', 'gaming', 'game', 'movie', 'film',
         'recipe', 'cooking', 'fashion', 'beauty', 'sports', 'football', 'basketball',
         'unboxing', 'reaction', 'prank', 'challenge', 'tiktok', 'shorts compilation',
-        'nickel battery diy', 'nickel battery repair', 'phone battery', 'laptop battery',
-        'battery replacement', 'battery mod', 'battery hack'
+        'gold digger', 'gold rush tv', 'gold panning hobby', 'silver screen',
+        'silver tongue', 'gold medal', 'silver medal', 'gold teeth', 'gold chain',
+        'jewelry making', 'diy jewelry', 'gold plating diy', 'silver polish'
     ]
     
     # Exclude channels that are likely to have low-quality content
@@ -277,26 +283,32 @@ def extract_company_info(title, channel):
     Returns:
         tuple: (company_name, stock_ticker)
     """
-    # Common nickel companies and their tickers
+    # Common gold & silver companies and their tickers
     companies = {
-        'talon metals': {'name': 'Talon Metals', 'ticker': 'TLO'},
-        'power metallic': {'name': 'Power Metallic Mines', 'ticker': 'PNPN'},
-        'power nickel': {'name': 'Power Metallic Mines', 'ticker': 'PNPN'},
-        'canada nickel': {'name': 'Canada Nickel', 'ticker': 'CNC'},
-        'fpx nickel': {'name': 'FPX Nickel', 'ticker': 'FPX'},
-        'nickel 28': {'name': 'Nickel 28 Capital', 'ticker': 'NICX'},
-        'magna mining': {'name': 'Magna Mining', 'ticker': 'NICU'},
-        'royal nickel': {'name': 'Royal Nickel', 'ticker': 'RNC'},
-        'stillwater critical': {'name': 'Stillwater Critical Minerals', 'ticker': 'SRL'},
-        'grid metals': {'name': 'Grid Metals', 'ticker': 'GRDM'},
-        'nickel creek': {'name': 'Nickel Creek Platinum', 'ticker': 'NIC'},
-        'first atlantic nickel': {'name': 'First Atlantic Nickel', 'ticker': 'FAN'},
-        'palladium one': {'name': 'Palladium One Mining', 'ticker': 'PDCO'},
-        'ev nickel': {'name': 'EV Nickel', 'ticker': 'EVNI'},
-        'norilsk': {'name': 'Norilsk Nickel', 'ticker': 'NILSY'},
-        'vale': {'name': 'Vale', 'ticker': 'VALE'},
-        'glencore': {'name': 'Glencore', 'ticker': 'GLNCY'},
-        'bhp': {'name': 'BHP Group', 'ticker': 'BHP'},
+        'newmont': {'name': 'Newmont Corporation', 'ticker': 'NEM'},
+        'barrick': {'name': 'Barrick Gold', 'ticker': 'GOLD'},
+        'agnico eagle': {'name': 'Agnico Eagle Mines', 'ticker': 'AEM'},
+        'franco-nevada': {'name': 'Franco-Nevada', 'ticker': 'FNV'},
+        'wheaton precious': {'name': 'Wheaton Precious Metals', 'ticker': 'WPM'},
+        'royal gold': {'name': 'Royal Gold', 'ticker': 'RGLD'},
+        'kinross': {'name': 'Kinross Gold', 'ticker': 'KGC'},
+        'gold fields': {'name': 'Gold Fields', 'ticker': 'GFI'},
+        'anglogold': {'name': 'AngloGold Ashanti', 'ticker': 'AU'},
+        'pan american silver': {'name': 'Pan American Silver', 'ticker': 'PAAS'},
+        'first majestic': {'name': 'First Majestic Silver', 'ticker': 'AG'},
+        'hecla mining': {'name': 'Hecla Mining', 'ticker': 'HL'},
+        'coeur mining': {'name': 'Coeur Mining', 'ticker': 'CDE'},
+        'endeavour silver': {'name': 'Endeavour Silver', 'ticker': 'EXK'},
+        'silvercorp': {'name': 'SilverCorp Metals', 'ticker': 'SVM'},
+        'osisko': {'name': 'Osisko Gold Royalties', 'ticker': 'OR'},
+        'sandstorm': {'name': 'Sandstorm Gold Royalties', 'ticker': 'SAND'},
+        'alamos gold': {'name': 'Alamos Gold', 'ticker': 'AGI'},
+        'iamgold': {'name': 'IAMGOLD', 'ticker': 'IAG'},
+        'eldorado gold': {'name': 'Eldorado Gold', 'ticker': 'EGO'},
+        'b2gold': {'name': 'B2Gold', 'ticker': 'BTG'},
+        'equinox gold': {'name': 'Equinox Gold', 'ticker': 'EQX'},
+        'wesdome': {'name': 'Wesdome Gold Mines', 'ticker': 'WDO'},
+        'torex gold': {'name': 'Torex Gold Resources', 'ticker': 'TXG'},
     }
     
     text = (title + ' ' + channel).lower()
@@ -309,47 +321,47 @@ def extract_company_info(title, channel):
 
 def scrape_youtube_videos():
     """
-    Main function to scrape YouTube videos for nickel content.
+    Main function to scrape YouTube videos for gold & silver content.
     Returns a list of videos organized by category.
     """
     logger.info("=" * 60)
-    logger.info("Starting YouTube Videos Scraping for Nickel Content")
+    logger.info("Starting YouTube Videos Scraping for Gold & Silver Content")
     logger.info("=" * 60)
     
     # Define search queries for each category (multiple queries per category for better results)
     search_queries = {
         'Featured': [
-            'nickel market analysis',
-            'nickel price forecast',
-            'nickel investment outlook',
-            'nickel stocks 2024',
-            'nickel demand supply',
-            'battery metals nickel investment'
+            'gold market analysis',
+            'gold price forecast',
+            'silver price forecast',
+            'precious metals investment outlook',
+            'gold silver stocks',
+            'gold demand supply 2024'
         ],
         'Company': [
-            'nickel mining stocks',
-            'Canada Nickel company news',
-            'Talon Metals nickel',
-            'FPX Nickel update',
-            'nickel mining companies',
-            'nickel stock analysis'
+            'gold mining stocks',
+            'Newmont Barrick gold news',
+            'Agnico Eagle gold update',
+            'silver mining companies',
+            'gold royalty streaming stocks',
+            'junior gold mining stocks'
         ],
         'Podcast': [
-            'nickel market podcast',
-            'battery metals podcast',
-            'mining podcast nickel',
-            'commodity trading nickel',
-            'nickel investment interview',
-            'ev metals nickel podcast'
+            'gold market podcast',
+            'precious metals podcast',
+            'mining podcast gold silver',
+            'commodity trading gold',
+            'gold investment interview',
+            'silver investment podcast'
         ],
         'Education': [
-            'what is nickel metal',
-            'how nickel is mined',
-            'nickel uses applications',
-            'nickel market explained',
-            'nickel investment guide',
-            'battery metals nickel explained',
-            'nickel sulphide vs laterite'
+            'what is gold investing',
+            'how gold mining works',
+            'gold vs silver investment',
+            'precious metals market explained',
+            'gold etf vs physical gold',
+            'gold royalty streaming explained',
+            'silver supply demand explained'
         ]
     }
     
@@ -388,7 +400,7 @@ def scrape_youtube_videos():
         
         total_videos = sum(len(videos) for videos in all_videos.values())
         logger.info("=" * 60)
-        logger.info(f"YouTube Videos Scraping Complete!")
+        logger.info(f"YouTube Videos Scraping Complete! (Gold & Silver)")
         logger.info(f"Total videos scraped: {total_videos}")
         logger.info("=" * 60)
         
