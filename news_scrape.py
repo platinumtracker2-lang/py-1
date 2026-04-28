@@ -30,26 +30,31 @@ RSS_FEEDS = [
         "source": "Mining.com",
         "url": "https://www.mining.com/feed/",
         "limit": 10,
+        "fetch_og_image": True,   # supports OG image fetch
     },
     {
         "source": "Silver Institute",
         "url": "https://www.silverinstitute.org/feed/",
         "limit": 8,
+        "fetch_og_image": False,
     },
     {
         "source": "Seeking Alpha - Gold",
         "url": "https://seekingalpha.com/tag/gold.xml",
         "limit": 8,
+        "fetch_og_image": False,  # 403 on article pages
     },
     {
         "source": "Investing.com - Commodities",
         "url": "https://www.investing.com/rss/news_11.rss",
         "limit": 8,
+        "fetch_og_image": False,  # already has images in RSS
     },
     {
         "source": "Numismatic News",
         "url": "https://www.numismaticnews.net/feed",
         "limit": 6,
+        "fetch_og_image": True,   # supports OG image fetch
     },
 ]
 
@@ -117,6 +122,31 @@ def _extract_image(item):
     if enclosure is not None and "image" in enclosure.get("type", ""):
         return enclosure.get("url")
 
+    return None
+
+
+def _fetch_og_image(url):
+    """
+    Fetch the article page and extract the og:image meta tag.
+    Returns image URL string or None.
+    """
+    try:
+        r = requests.get(url, headers=HEADERS, timeout=10)
+        if r.status_code != 200:
+            return None
+        match = re.search(
+            r'<meta[^>]+property=["\']og:image["\'][^>]+content=["\']([^"\']+)["\']',
+            r.text
+        )
+        if not match:
+            match = re.search(
+                r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']og:image["\']',
+                r.text
+            )
+        if match:
+            return match.group(1).strip()
+    except Exception as e:
+        logger.debug(f"OG image fetch failed for {url}: {e}")
     return None
 
 
@@ -225,6 +255,11 @@ def scrape_rss_feeds(cursor):
 
             # ── Image ────────────────────────────────────
             image_url = _extract_image(item)
+            # If no image in RSS and source supports OG fetch, get from article page
+            if not image_url and feed.get("fetch_og_image"):
+                image_url = _fetch_og_image(url)
+                if image_url:
+                    logger.debug(f"  OG image fetched for: {title[:50]}")
 
             all_articles.append({
                 "source":    source,
