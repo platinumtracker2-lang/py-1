@@ -42,8 +42,8 @@ RSS_FEEDS = [
         "limit": 8,
     },
     {
-        "source": "Investing.com - Gold",
-        "url": "https://www.investing.com/rss/news_25.rss",
+        "source": "Investing.com - Commodities",
+        "url": "https://www.investing.com/rss/news_11.rss",
         "limit": 8,
     },
     {
