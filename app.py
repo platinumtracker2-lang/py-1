@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Main Application - Gold & Silver Stock Data Collection Pipeline
+Main Application - Platinum/PGM Stock Data Collection Pipeline
 Process-based execution: 
 - process1 = stock fetcher
 - process2 = press release scraper
@@ -30,7 +30,7 @@ logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.FileHandler('gold_silver_data_pipeline.log'),
+        logging.FileHandler('pgm_data_pipeline.log'),
         logging.StreamHandler(sys.stdout)
     ]
 )

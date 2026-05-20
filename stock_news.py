@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 def load_nickel_stocks():
     """Load gold & silver stock tickers from CSV file"""
     stocks = []
-    csv_path = 'gold_silver_stocks_complete.csv'
+    csv_path = 'platinum-pgm-stocks-complete.csv'
     
     try:
         with open(csv_path, 'r', encoding='utf-8') as file:

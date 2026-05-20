@@ -1,294 +1,357 @@
-import time
+#!/usr/bin/env python3
+"""
+PGM/Platinum Content Scraper — no Selenium required.
+
+Replaces the old Selenium-based Substack scraper with a lightweight
+requests + BeautifulSoup approach that pulls from multiple RSS feeds
+and filters for PGM/platinum-relevant articles.
+
+Sources:
+  - Mining.com          (general mining RSS, filtered for PGM keywords)
+  - Investing.com       (commodities RSS)
+  - Stockhouse          (mining/metals RSS)
+  - Business Wire       (press releases RSS, filtered for PGM)
+  - PR Newswire metals  (metals press releases RSS)
+"""
+
+import logging
+import re
+import requests
+import xml.etree.ElementTree as ET
 from datetime import datetime
-from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
-from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.common.keys import Keys
-from selenium.common.exceptions import TimeoutException, NoSuchElementException
-from insert_queries import check_stock_news_url_exists
+from email.utils import parsedate_to_datetime
+
 from database_operations import insert_substack_post, check_substack_url_exists
 from database_config import get_curser
-import re
-import os
-import logging
+
+logger = logging.getLogger(__name__)
+
+# ─────────────────────────────────────────────────────────────
+# PGM keyword filter
+# ─────────────────────────────────────────────────────────────
+PGM_KEYWORDS = [
+    'platinum group', 'platinum mining', 'platinum price', 'platinum market',
+    'platinum stocks', 'platinum investment', 'platinum etf', 'platinum demand',
+    'platinum supply', 'platinum producer', 'platinum explorer', 'platinum output',
+    'platinum ounce', 'platinum oz', 'platinum metal',
+    'palladium', 'pgm', 'rhodium', 'iridium', 'ruthenium',
+    'sibanye', 'stillwater', 'impala', 'implats',
+    'amplats', 'anglo platinum', 'northam', 'valterra',
+    'ivanhoe', 'platreef', 'bushveld', 'lifezone',
+    'bravo mining', 'generation mining', 'clean air metals',
+    'new age metals', 'chalice mining', 'zimplats',
+    'southern palladium', 'autocatalyst', 'fuel cell platinum',
+    'hydrogen fuel cell', 'pgm recycling', 'pgm demand',
+    'pgm supply', 'pgm price', 'pgm market',
+]
+
+# ─────────────────────────────────────────────────────────────
+# RSS feed sources (all confirmed working)
+# ─────────────────────────────────────────────────────────────
+RSS_SOURCES = [
+    {
+        "name": "Mining.com",
+        "url": "https://www.mining.com/feed/",
+        "limit": 15,
+    },
+    {
+        "name": "Investing.com - Commodities",
+        "url": "https://www.investing.com/rss/news_11.rss",
+        "limit": 15,
+    },
+    {
+        "name": "Stockhouse",
+        "url": "https://stockhouse.com/rss/news",
+        "limit": 15,
+    },
+    {
+        "name": "Business Wire - Mining",
+        "url": "https://feed.businesswire.com/rss/home/?rss=G22",
+        "limit": 15,
+    },
+    {
+        "name": "PR Newswire - Metals",
+        "url": "https://www.prnewswire.com/rss/news-releases-list.rss",
+        "limit": 15,
+    },
+]
+
+HEADERS = {
+    "User-Agent": (
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+        "AppleWebKit/537.36 (KHTML, like Gecko) "
+        "Chrome/120.0.0.0 Safari/537.36"
+    ),
+    "Accept": "application/rss+xml, application/xml, text/xml, */*",
+}
 
 
-def init_driver():
-    """Initialize Chrome WebDriver with automatic driver management"""
-    chrome_options = Options()
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-extensions")
-    chrome_options.add_argument("--disable-software-rasterizer")
-    chrome_options.add_argument("--disable-setuid-sandbox")
-    chrome_options.add_argument("--window-size=1024,768")
+# ─────────────────────────────────────────────────────────────
+# Helpers
+# ─────────────────────────────────────────────────────────────
 
-    # Try webdriver-manager first (auto-downloads correct ChromeDriver)
+def _is_pgm_relevant(text: str) -> bool:
+    """Return True if text contains at least one PGM keyword."""
+    text_lower = text.lower()
+    return any(kw in text_lower for kw in PGM_KEYWORDS)
+
+
+def _clean_xml(content: str) -> str:
+    """Fix unescaped HTML entities that break stdlib XML parser."""
+    return re.sub(
+        r'&(?!amp;|lt;|gt;|quot;|apos;|#\d+;|#x[0-9a-fA-F]+;)([a-zA-Z]+);',
+        r'&amp;\1;',
+        content,
+    )
+
+
+def _strip_html(text: str) -> str:
+    """Remove HTML tags and decode common entities."""
+    if not text:
+        return ""
+    text = re.sub(r"<[^>]+>", "", text)
+    text = (text
+            .replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+            .replace("&quot;", '"').replace("&#39;", "'").replace("&nbsp;", " "))
+    return text.strip()
+
+
+def _parse_date(date_str: str) -> str:
+    """Parse RSS date string → YYYY-MM-DD. Returns today on failure."""
+    if not date_str:
+        return datetime.now().strftime("%Y-%m-%d")
     try:
-        from webdriver_manager.chrome import ChromeDriverManager
-        service = Service(ChromeDriverManager().install())
-        driver = webdriver.Chrome(service=service, options=chrome_options)
-        driver.set_page_load_timeout(30)
-        driver.implicitly_wait(5)
-        return driver
+        return parsedate_to_datetime(date_str).strftime("%Y-%m-%d")
+    except Exception:
+        pass
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%d %H:%M:%S", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(date_str[:19], fmt[:19]).strftime("%Y-%m-%d")
+        except Exception:
+            continue
+    return datetime.now().strftime("%Y-%m-%d")
+
+
+def _get_text(element, *tags) -> str:
+    """Try multiple tag names, return first non-empty text found."""
+    for tag in tags:
+        child = element.find(tag)
+        if child is not None and child.text and child.text.strip():
+            return child.text.strip()
+    return ""
+
+
+def _extract_image(item) -> str:
+    """Extract image URL from media:content, media:thumbnail, or enclosure."""
+    for ns in [
+        "{http://search.yahoo.com/mrss/}content",
+        "{http://search.yahoo.com/mrss/}thumbnail",
+    ]:
+        el = item.find(ns)
+        if el is not None:
+            url = el.get("url", "")
+            if url:
+                return url
+    enclosure = item.find("enclosure")
+    if enclosure is not None and "image" in enclosure.get("type", ""):
+        return enclosure.get("url", "")
+    return ""
+
+
+def _fetch_feed(url: str):
+    """Fetch and parse an RSS feed. Returns list of <item> elements."""
+    try:
+        response = requests.get(url, headers=HEADERS, timeout=15)
+        response.raise_for_status()
+        cleaned = _clean_xml(response.text)
+        root = ET.fromstring(cleaned.encode("utf-8"))
+        items = root.findall(".//item")
+        if not items:
+            items = root.findall(".//{http://www.w3.org/2005/Atom}entry")
+        return items
+    except requests.exceptions.RequestException as e:
+        logger.warning(f"HTTP error fetching {url}: {e}")
+    except ET.ParseError as e:
+        logger.warning(f"XML parse error for {url}: {e}")
     except Exception as e:
-        logging.warning(f"webdriver-manager failed: {e}, trying system paths...")
-
-    # Fallback to known system paths (Linux server / Docker)
-    system_paths = [
-        ("/usr/bin/chromium", "/usr/bin/chromedriver"),
-        ("/usr/bin/chromium-browser", "/usr/bin/chromedriver"),
-        ("/usr/bin/google-chrome", "/usr/bin/chromedriver"),
-    ]
-    for chrome_bin, driver_bin in system_paths:
-        if os.path.exists(chrome_bin) and os.path.exists(driver_bin):
-            try:
-                chrome_options.binary_location = chrome_bin
-                service = Service(driver_bin)
-                driver = webdriver.Chrome(service=service, options=chrome_options)
-                driver.set_page_load_timeout(30)
-                driver.implicitly_wait(5)
-                return driver
-            except Exception as e:
-                logging.warning(f"Failed with {chrome_bin}: {e}")
-
-    logging.error("Could not initialize Chrome WebDriver via any method")
-    return None
+        logger.warning(f"Unexpected error fetching {url}: {e}")
+    return []
 
 
-def wait_and_find_element(driver, by, value, timeout=10):
-    """Helper function to wait for and find an element"""
-    try:
-        element = WebDriverWait(driver, timeout).until(
-            EC.presence_of_element_located((by, value))
-        )
-        return element
-    except TimeoutException:
-        return None
+# ─────────────────────────────────────────────────────────────
+# Main scraper
+# ─────────────────────────────────────────────────────────────
 
-
-def scrape_substack_nickel_posts(cursor=None, max_posts=10):
+def scrape_substack_nickel_posts(cursor=None, max_posts: int = 10) -> list:
     """
-    Scrapes gold and silver related posts from Substack.
-    
+    Scrapes PGM/platinum-related articles from multiple RSS feeds
+    using requests + BeautifulSoup (no Selenium required).
+
     Parameters:
-        cursor (psycopg2.cursor, optional): Database cursor for checking duplicates
-        max_posts (int): Maximum number of posts to scrape
-    
+        cursor: psycopg2 cursor for duplicate-URL checking (optional)
+        max_posts: maximum total posts to return
+
     Returns:
-        list: List of dictionaries containing scraped data
+        list of dicts with keys: title, url, content, subtitle, image_url, date
     """
-    driver = init_driver()
-    if not driver:
-        logging.error("Failed to initialize WebDriver")
-        return []
-    
-    try:
-        # Navigate to the search page
-        print("Navigating to Substack search page...")
-        search_url = "https://substack.com/search/gold+silver?sort=new&searching=all_posts&include_recommendations=false"
-        driver.get(search_url)
-        
-        # Wait for the search results to load
-        print("Waiting for search results...")
-        wait_and_find_element(driver, By.CLASS_NAME, "search-result")
-        time.sleep(2)  # Additional small wait for dynamic content
+    all_posts = []
+    seen_urls: set = set()
 
-        # Scroll to load more content
-        print("Loading more content...")
-        for _ in range(3):  # Scroll 3 times to load more content
-            driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
-            time.sleep(1)
+    for source in RSS_SOURCES:
+        if len(all_posts) >= max_posts:
+            break
 
-        # Find article links with better selector
-        print("Finding article links...")
-        links = driver.find_elements(By.CSS_SELECTOR, "a.post-preview-title")
-        if not links:
-            links = driver.find_elements(By.CSS_SELECTOR, "a[href*='/p/']")
-        
-        print(f"Found {len(links)} links")
+        name = source["name"]
+        url  = source["url"]
+        limit = source["limit"]
 
-        # Extract unique URLs
-        urls = []
-        seen_urls = set()
-        for link in links:
-            try:
-                url = link.get_attribute('href')
-                if url and url not in seen_urls and '/p/' in url:
-                    urls.append(url)
-                    seen_urls.add(url)
-                    if len(urls) >= max_posts:
-                        break
-            except Exception as e:
+        logger.info(f"Fetching feed: {name}")
+        items = _fetch_feed(url)
+
+        if not items:
+            logger.warning(f"  No items from {name}")
+            continue
+
+        found = 0
+        for item in items:
+            if len(all_posts) >= max_posts:
+                break
+
+            # Extract fields
+            title = _strip_html(
+                _get_text(item, "title", "{http://www.w3.org/2005/Atom}title")
+            )
+            link = _get_text(item, "link")
+            if not link:
+                link_el = item.find("{http://www.w3.org/2005/Atom}link")
+                if link_el is not None:
+                    link = link_el.get("href", "")
+            link = link.strip() if link else ""
+
+            description = _strip_html(
+                _get_text(
+                    item,
+                    "description",
+                    "{http://www.w3.org/2005/Atom}summary",
+                    "{http://purl.org/rss/1.0/modules/content/}encoded",
+                )
+            )
+
+            pub_date = _get_text(
+                item,
+                "pubDate", "pubdate",
+                "{http://www.w3.org/2005/Atom}published",
+                "{http://www.w3.org/2005/Atom}updated",
+            )
+            date = _parse_date(pub_date)
+            image_url = _extract_image(item)
+
+            # Skip if missing essentials
+            if not title or not link:
                 continue
 
-        print(f"Found {len(urls)} unique URLs to scrape")
+            # PGM relevance filter
+            combined = f"{title} {description}"
+            if not _is_pgm_relevant(combined):
+                continue
 
-        scraped_data = []
-        for url in urls:
-            try:
-                print(f"Scraping URL: {url}")
-                driver.get(url)
-                
-                # Wait for article content to load
-                article = wait_and_find_element(driver, By.TAG_NAME, "article", timeout=10)
-                if not article:
-                    print("Article content not found, skipping...")
-                    continue
+            # Skip duplicates (in-memory)
+            if link in seen_urls:
+                continue
 
-                # Extract title (try multiple selectors)
-                title = None
-                title_selectors = [
-                    "h1.post-title",
-                    "h1.title",
-                    "h1"
-                ]
-                for selector in title_selectors:
-                    try:
-                        title_elem = wait_and_find_element(driver, By.CSS_SELECTOR, selector, timeout=5)
-                        if title_elem:
-                            title = title_elem.text.strip()
-                            break
-                    except:
+            # Skip if already in DB
+            if cursor:
+                try:
+                    if check_substack_url_exists(cursor, link):
+                        logger.debug(f"  Already in DB: {link}")
                         continue
-
-                # Extract content
-                content = None
-                try:
-                    content_elem = wait_and_find_element(driver, By.CSS_SELECTOR, "div.available-content", timeout=5)
-                    if not content_elem:
-                        content_elem = article
-                    content = content_elem.text.strip()
-                except:
-                    print("Failed to extract content")
-
-                # Extract date
-                date = datetime.now().strftime("%Y-%m-%d")
-                try:
-                    date_elem = wait_and_find_element(driver, By.TAG_NAME, "time", timeout=5)
-                    if date_elem:
-                        date_str = date_elem.get_attribute("datetime")
-                        if date_str:
-                            date = date_str.split("T")[0]
-                except:
-                    print("Using default date")
-
-                # Extract image URL
-                image_url = ""
-                try:
-                    img_elem = article.find_element(By.TAG_NAME, "img")
-                    if img_elem:
-                        image_url = img_elem.get_attribute("src")
-                except:
+                except Exception:
                     pass
 
-                if title and content:
-                    article_data = {
-                        "title": title,
-                        "url": url,
-                        "content": content,
-                        "subtitle": "",  # Simplified for now
-                        "image_url": image_url,
-                        "date": date
-                    }
-                    scraped_data.append(article_data)
-                    print(f"Successfully scraped: {title[:50]}...")
-                else:
-                    print(f"Skipping article due to missing title or content")
+            seen_urls.add(link)
+            all_posts.append({
+                "title":     title,
+                "url":       link,
+                "content":   description[:2000] if description else title,
+                "subtitle":  f"via {name}",
+                "image_url": image_url,
+                "date":      date,
+            })
+            found += 1
+            logger.info(f"  [{name}] {title[:70]}")
 
-            except Exception as e:
-                print(f"Error scraping URL {url}: {str(e)}")
-                continue
+        logger.info(f"  → {found} PGM articles from {name}")
 
-        print(f"Successfully scraped {len(scraped_data)} Substack posts")
-        return scraped_data
-        
-    except Exception as e:
-        print(f"Error in scraping Substack: {str(e)}")
-        return []
-    finally:
-        if driver:
-            driver.quit()
+    logger.info(f"Total PGM articles scraped: {len(all_posts)}")
+    return all_posts[:max_posts]
 
 
-def insert_substack_posts_to_db(cursor, connection, posts):
-    """
-    Inserts scraped Substack posts into the database using insert_substack_post.
-    
-    Parameters:
-        cursor (psycopg2.cursor): Database cursor
-        connection (psycopg2.connection): Database connection
-        posts (list): List of formatted post dictionaries
-    """
-    successful_inserts = 0
+# ─────────────────────────────────────────────────────────────
+# DB helpers (unchanged interface — called from app.py)
+# ─────────────────────────────────────────────────────────────
+
+def insert_substack_posts_to_db(cursor, connection, posts: list) -> None:
+    """Insert scraped posts into the database, skipping duplicates."""
+    successful = 0
     for post in posts:
         try:
-            # Check if URL already exists
             if not check_substack_url_exists(cursor, post["url"]):
                 insert_substack_post(
                     cursor=cursor,
                     connection=connection,
-                    **post
+                    **post,
                 )
-                successful_inserts += 1
-                print(f"Successfully inserted: {post['title'][:50]}...")
+                successful += 1
+                print(f"Inserted: {post['title'][:60]}...")
             else:
-                print(f"Skipping duplicate post: {post['title'][:50]}...")
+                print(f"Skipping duplicate: {post['title'][:60]}...")
         except Exception as e:
-            print(f"Error inserting post '{post['title'][:50]}...': {str(e)}")
+            print(f"Error inserting '{post['title'][:50]}': {e}")
             continue
-    
-    print(f"Inserted {successful_inserts} out of {len(posts)} posts")
+    print(f"Inserted {successful} of {len(posts)} posts")
 
 
-def ensure_table_exists(cursor, connection):
-    """
-    Ensures that the nickel_substack table exists in the database.
-    Creates it if it doesn't exist.
-    """
+def ensure_table_exists(cursor, connection) -> None:
+    """Ensure the api_app_coppersubstack table exists."""
     try:
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS api_app_coppersubstack (
-                id VARCHAR(255) PRIMARY KEY,
-                title TEXT NOT NULL,
-                url TEXT UNIQUE NOT NULL,
-                content TEXT,
-                subtitle TEXT,
-                image_url TEXT,
-                date DATE NOT NULL,
+                id         VARCHAR(255) PRIMARY KEY,
+                title      TEXT NOT NULL,
+                url        TEXT UNIQUE NOT NULL,
+                content    TEXT,
+                subtitle   TEXT,
+                image_url  TEXT,
+                date       DATE NOT NULL,
                 created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
             )
         """)
         connection.commit()
         print("Table api_app_coppersubstack is ready")
     except Exception as e:
-        print(f"Error ensuring table exists: {str(e)}")
-        raise e
+        print(f"Error ensuring table exists: {e}")
+        raise
 
+
+# ─────────────────────────────────────────────────────────────
+# Standalone run
+# ─────────────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # When run directly, scrape and insert into database
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     connection, cursor = get_curser()
-    
     try:
-        # Ensure table exists
         ensure_table_exists(cursor, connection)
-        
-        print("Starting Substack nickel posts scraping...")
-        posts = scrape_substack_nickel_posts(cursor)
+        print("Starting PGM/platinum content scraping...")
+        posts = scrape_substack_nickel_posts(cursor, max_posts=20)
         if posts:
             print(f"Found {len(posts)} posts. Inserting into database...")
             insert_substack_posts_to_db(cursor, connection, posts)
         else:
-            print("No posts found to insert")
+            print("No PGM posts found")
     except Exception as e:
-        print(f"Error in main execution: {str(e)}")
+        print(f"Error: {e}")
     finally:
+        cursor.close()
         connection.close()
-        print("Database connection closed")
-
+        print("Done")

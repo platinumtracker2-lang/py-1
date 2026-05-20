@@ -1,8 +1,8 @@
 """
-YouTube Videos Updater Script for Gold & Silver Content
+YouTube Videos Updater Script for Platinum/PGM Content
 
 This script updates the VideoPageData table with fresh YouTube videos
-by searching for gold mining, silver mining, precious metals market analysis,
+by searching for platinum mining, palladium, PGM market analysis,
 and related content in different categories.
 """
 
@@ -211,55 +211,56 @@ def search_youtube_videos(query, max_results=10):
 
 def is_relevant_video(title, channel, duration):
     """
-    Check if video is relevant to nickel content and has good quality indicators
-    
+    Check if video is relevant to PGM/platinum content and has good quality indicators
+
     Args:
         title (str): Video title
         channel (str): Channel name
         duration (str): Video duration
-    
+
     Returns:
         bool: True if video is relevant and high quality
     """
     text = (title + ' ' + channel).lower()
-    
-    # Must contain gold/silver-related keywords
+
+    # Must contain PGM/platinum-related keywords
     required_keywords = [
-        'gold', 'silver', 'precious metals', 'gold mining', 'silver mining',
-        'gold price', 'silver price', 'gold market', 'silver market',
-        'gold stocks', 'silver stocks', 'gold futures', 'silver futures',
-        'gold investment', 'silver investment', 'gold etf', 'silver etf',
-        'gold royalty', 'silver royalty', 'gold streaming', 'gold bullion',
-        'silver bullion', 'xau', 'xag', 'mining stocks', 'commodity',
-        'metal prices', 'gold demand', 'silver demand', 'gold supply', 'silver supply',
-        'gold producer', 'silver producer', 'gold explorer', 'junior miner',
-        'central bank gold', 'gold reserve', 'safe haven', 'inflation hedge'
+        'platinum', 'palladium', 'pgm', 'pgm stocks', 'pgm mining',
+        'platinum group metals', 'platinum price', 'palladium price',
+        'platinum market', 'palladium market', 'platinum stocks', 'palladium stocks',
+        'platinum mining', 'palladium mining', 'platinum investment', 'palladium investment',
+        'platinum etf', 'palladium etf', 'rhodium', 'iridium', 'ruthenium', 'osmium',
+        'sibanye', 'impala', 'amplats', 'anglo platinum', 'northam platinum',
+        'platinum group', 'pgm recycling', 'autocatalyst', 'fuel cell platinum',
+        'hydrogen platinum', 'platinum demand', 'palladium demand',
+        'platinum supply', 'palladium supply', 'pgm producer', 'pgm explorer',
+        'junior pgm', 'platreef', 'bushveld',
+        'stillwater', 'ivanhoe', 'lifezone', 'clean air metals'
     ]
-    
+
     # Exclude irrelevant content
     exclude_keywords = [
         'music', 'song', 'album', 'concert', 'gaming', 'game', 'movie', 'film',
         'recipe', 'cooking', 'fashion', 'beauty', 'sports', 'football', 'basketball',
         'unboxing', 'reaction', 'prank', 'challenge', 'tiktok', 'shorts compilation',
-        'gold digger', 'gold rush tv', 'gold panning hobby', 'silver screen',
-        'silver tongue', 'gold medal', 'silver medal', 'gold teeth', 'gold chain',
-        'jewelry making', 'diy jewelry', 'gold plating diy', 'silver polish'
+        'platinum hair', 'platinum blonde', 'platinum card', 'platinum award',
+        'platinum record', 'platinum trophy', 'platinum wedding', 'jewelry making',
+        'diy jewelry', 'platinum ring diy', 'palladium wedding'
     ]
-    
+
     # Exclude channels that are likely to have low-quality content
     exclude_channels = [
         'music', 'entertainment', 'gaming', 'kids', 'cartoon', 'anime',
         'reaction', 'compilation', 'funny', 'meme', 'diy', 'crafts'
     ]
-    
+
     has_required = any(keyword in text for keyword in required_keywords)
     has_excluded = any(keyword in text for keyword in exclude_keywords)
     has_excluded_channel = any(keyword in channel.lower() for keyword in exclude_channels)
-    
+
     # Additional quality checks
     if duration:
         try:
-            # Parse duration and exclude very long videos (likely streams) or very short ones
             parts = duration.split(':')
             if len(parts) == 2:  # MM:SS format
                 minutes = int(parts[0])
@@ -269,143 +270,138 @@ def is_relevant_video(title, channel, duration):
                     return False
         except:
             pass
-    
+
     return has_required and not has_excluded and not has_excluded_channel
 
 def extract_company_info(title, channel):
     """
     Extract company name and stock ticker from video title and channel.
-    
+
     Args:
         title (str): Video title
         channel (str): Channel name
-    
+
     Returns:
         tuple: (company_name, stock_ticker)
     """
-    # Common gold & silver companies and their tickers
+    # Common PGM/platinum companies and their tickers
     companies = {
-        'newmont': {'name': 'Newmont Corporation', 'ticker': 'NEM'},
-        'barrick': {'name': 'Barrick Gold', 'ticker': 'GOLD'},
-        'agnico eagle': {'name': 'Agnico Eagle Mines', 'ticker': 'AEM'},
-        'franco-nevada': {'name': 'Franco-Nevada', 'ticker': 'FNV'},
-        'wheaton precious': {'name': 'Wheaton Precious Metals', 'ticker': 'WPM'},
-        'royal gold': {'name': 'Royal Gold', 'ticker': 'RGLD'},
-        'kinross': {'name': 'Kinross Gold', 'ticker': 'KGC'},
-        'gold fields': {'name': 'Gold Fields', 'ticker': 'GFI'},
-        'anglogold': {'name': 'AngloGold Ashanti', 'ticker': 'AU'},
-        'pan american silver': {'name': 'Pan American Silver', 'ticker': 'PAAS'},
-        'first majestic': {'name': 'First Majestic Silver', 'ticker': 'AG'},
-        'hecla mining': {'name': 'Hecla Mining', 'ticker': 'HL'},
-        'coeur mining': {'name': 'Coeur Mining', 'ticker': 'CDE'},
-        'endeavour silver': {'name': 'Endeavour Silver', 'ticker': 'EXK'},
-        'silvercorp': {'name': 'SilverCorp Metals', 'ticker': 'SVM'},
-        'osisko': {'name': 'Osisko Gold Royalties', 'ticker': 'OR'},
-        'sandstorm': {'name': 'Sandstorm Gold Royalties', 'ticker': 'SAND'},
-        'alamos gold': {'name': 'Alamos Gold', 'ticker': 'AGI'},
-        'iamgold': {'name': 'IAMGOLD', 'ticker': 'IAG'},
-        'eldorado gold': {'name': 'Eldorado Gold', 'ticker': 'EGO'},
-        'b2gold': {'name': 'B2Gold', 'ticker': 'BTG'},
-        'equinox gold': {'name': 'Equinox Gold', 'ticker': 'EQX'},
-        'wesdome': {'name': 'Wesdome Gold Mines', 'ticker': 'WDO'},
-        'torex gold': {'name': 'Torex Gold Resources', 'ticker': 'TXG'},
+        'sibanye': {'name': 'Sibanye Stillwater', 'ticker': 'SBSW'},
+        'stillwater': {'name': 'Sibanye Stillwater', 'ticker': 'SBSW'},
+        'impala': {'name': 'Impala Platinum Holdings', 'ticker': 'IMPUY'},
+        'implats': {'name': 'Impala Platinum Holdings', 'ticker': 'IMPUY'},
+        'anglo platinum': {'name': 'Valterra Platinum (Anglo Plat)', 'ticker': 'ANGPY'},
+        'amplats': {'name': 'Valterra Platinum (Anglo Plat)', 'ticker': 'ANGPY'},
+        'valterra': {'name': 'Valterra Platinum (Anglo Plat)', 'ticker': 'ANGPY'},
+        'ivanhoe': {'name': 'Ivanhoe Mines (Platreef)', 'ticker': 'IVN'},
+        'northam': {'name': 'Northam Platinum', 'ticker': 'NPTOY'},
+        'anglo american': {'name': 'Anglo American', 'ticker': 'NGLOY'},
+        'glencore': {'name': 'Glencore (PGM recycling)', 'ticker': 'GLEN'},
+        'platinum group metals': {'name': 'Platinum Group Metals', 'ticker': 'PLG'},
+        'eastern platinum': {'name': 'Eastern Platinum', 'ticker': 'ELR.TO'},
+        'lifezone': {'name': 'Lifezone Metals (recycling)', 'ticker': 'LZM'},
+        'bravo mining': {'name': 'Bravo Mining (Luanga PGM)', 'ticker': 'BRVO'},
+        'generation mining': {'name': 'Generation Mining (Marathon)', 'ticker': 'GENM.TO'},
+        'clean air metals': {'name': 'Clean Air Metals', 'ticker': 'CLRMF'},
+        'new age metals': {'name': 'New Age Metals', 'ticker': 'NAM.V'},
+        'chalice mining': {'name': 'Chalice Mining', 'ticker': 'CHN.AX'},
+        'zimplats': {'name': 'Zimplats Holdings', 'ticker': 'ZIM.AX'},
+        'podium minerals': {'name': 'Podium Minerals', 'ticker': 'POD.AX'},
+        'southern palladium': {'name': 'Southern Palladium', 'ticker': 'SPD.AX'},
+        'valore metals': {'name': 'ValOre Metals', 'ticker': 'VO.V'},
     }
-    
+
     text = (title + ' ' + channel).lower()
-    
+
     for key, info in companies.items():
         if key in text:
             return info['name'], info['ticker']
-    
+
     return None, None
 
 def scrape_youtube_videos():
     """
-    Main function to scrape YouTube videos for gold & silver content.
+    Main function to scrape YouTube videos for Platinum/PGM content.
     Returns a list of videos organized by category.
     """
     logger.info("=" * 60)
-    logger.info("Starting YouTube Videos Scraping for Gold & Silver Content")
+    logger.info("Starting YouTube Videos Scraping for Platinum/PGM Content")
     logger.info("=" * 60)
-    
+
     # Define search queries for each category (multiple queries per category for better results)
     search_queries = {
         'Featured': [
-            'gold market analysis',
-            'gold price forecast',
-            'silver price forecast',
-            'precious metals investment outlook',
-            'gold silver stocks',
-            'gold demand supply 2024'
+            'platinum market analysis',
+            'platinum price forecast',
+            'palladium price forecast',
+            'pgm metals investment outlook',
+            'platinum palladium stocks',
+            'platinum demand supply 2024'
         ],
         'Company': [
-            'gold mining stocks',
-            'Newmont Barrick gold news',
-            'Agnico Eagle gold update',
-            'silver mining companies',
-            'gold royalty streaming stocks',
-            'junior gold mining stocks'
+            'pgm mining stocks',
+            'sibanye stillwater news',
+            'impala platinum update',
+            'platinum group metals company',
+            'palladium mining companies',
+            'junior pgm mining stocks'
         ],
         'Podcast': [
-            'gold market podcast',
-            'precious metals podcast',
-            'mining podcast gold silver',
-            'commodity trading gold',
-            'gold investment interview',
-            'silver investment podcast'
+            'platinum market podcast',
+            'pgm metals podcast',
+            'mining podcast platinum palladium',
+            'commodity trading platinum',
+            'platinum investment interview',
+            'palladium investment podcast'
         ],
         'Education': [
-            'what is gold investing',
-            'how gold mining works',
-            'gold vs silver investment',
-            'precious metals market explained',
-            'gold etf vs physical gold',
-            'gold royalty streaming explained',
-            'silver supply demand explained'
+            'what is platinum investing',
+            'how platinum mining works',
+            'platinum vs palladium investment',
+            'pgm metals market explained',
+            'platinum etf vs physical platinum',
+            'pgm autocatalyst demand explained',
+            'palladium supply demand explained'
         ]
     }
-    
+
     all_videos = {}
-    
+
     try:
-        # Search and collect videos for each category
         for category, queries in search_queries.items():
             logger.info(f"\nProcessing category: {category}")
-            
+
             all_videos_for_category = []
-            
-            # Search using multiple queries for this category
+
             for query in queries:
                 logger.info(f"  Searching with query: '{query}'")
-                videos = search_youtube_videos(query, max_results=5)  # Reduced per query since we have multiple
+                videos = search_youtube_videos(query, max_results=5)
                 all_videos_for_category.extend(videos)
-            
+
             if all_videos_for_category:
-                # Remove duplicates based on video link
                 unique_videos = []
                 seen_urls = set()
                 for video in all_videos_for_category:
                     if video['link'] not in seen_urls:
                         unique_videos.append(video)
                         seen_urls.add(video['link'])
-                
-                # Limit to max 8 videos per category
+
                 final_videos = unique_videos[:8]
                 all_videos[category] = final_videos
-                
+
                 logger.info(f"  Total unique videos for {category}: {len(final_videos)}")
             else:
                 logger.warning(f"No videos found for category '{category}'")
                 all_videos[category] = []
-        
+
         total_videos = sum(len(videos) for videos in all_videos.values())
         logger.info("=" * 60)
-        logger.info(f"YouTube Videos Scraping Complete! (Gold & Silver)")
+        logger.info(f"YouTube Videos Scraping Complete! (Platinum/PGM)")
         logger.info(f"Total videos scraped: {total_videos}")
         logger.info("=" * 60)
-        
+
         return all_videos
-        
+
     except Exception as e:
         logger.error(f"Fatal error during YouTube videos scraping: {e}")
         raise

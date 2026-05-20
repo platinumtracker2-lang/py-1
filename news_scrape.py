@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Gold & Silver News Scraper - RSS Feed Based
-Sources (all confirmed working):
-  - Mining.com          (general mining, gold & silver)
-  - Silver Institute    (silver market research & news)
-  - Seeking Alpha Gold  (gold investment analysis)
-  - Investing.com Gold  (gold market news)
-  - Numismatic News     (precious metals & coins)
+Platinum/PGM News Scraper - RSS Feed Based
+Sources:
+  - Mining.com          (general mining, platinum & PGM)
+  - World Platinum Investment Council (WPIC) - platinum market research
+  - Seeking Alpha - Platinum  (platinum investment analysis)
+  - Investing.com - Commodities (commodity market news)
+  - Kitco News          (precious & platinum metals news)
 
 No Selenium, no API keys required. Pure RSS/requests.
 """
@@ -30,17 +30,17 @@ RSS_FEEDS = [
         "source": "Mining.com",
         "url": "https://www.mining.com/feed/",
         "limit": 10,
-        "fetch_og_image": True,   # supports OG image fetch
+        "fetch_og_image": True,
     },
     {
-        "source": "Silver Institute",
-        "url": "https://www.silverinstitute.org/feed/",
+        "source": "Kitco News",
+        "url": "https://www.kitco.com/rss/news/",
         "limit": 8,
         "fetch_og_image": False,
     },
     {
-        "source": "Seeking Alpha - Gold",
-        "url": "https://seekingalpha.com/tag/gold.xml",
+        "source": "Seeking Alpha - Palladium",
+        "url": "https://seekingalpha.com/tag/palladium.xml",
         "limit": 8,
         "fetch_og_image": False,  # 403 on article pages
     },
@@ -51,10 +51,10 @@ RSS_FEEDS = [
         "fetch_og_image": False,  # already has images in RSS
     },
     {
-        "source": "Numismatic News",
-        "url": "https://www.numismaticnews.net/feed",
-        "limit": 6,
-        "fetch_og_image": True,   # supports OG image fetch
+        "source": "Mining.com - Platinum",
+        "url": "https://www.mining.com/tag/platinum/feed/",
+        "limit": 8,
+        "fetch_og_image": True,
     },
 ]
 
